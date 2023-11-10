@@ -70,20 +70,26 @@
 - **Endpoint:** `POST /question/create/`
 - **Description:** Create one or multiple questions.
 - **Request Body:** JSON array containing question objects (See QuestionCreate model for object structure).
-- **Example Call:**
-  ```bash
-  curl -X POST -H "Content-Type: application/json" -d '[
-    {
-      "question": "What is the capital of Spain?",
-      "options": ["Madrid", "Barcelona", "Seville", "Valencia"],
-      "correct_answer": "Madrid",
-      "level": "Intermediate",
-      "industry": "Geography",
-      "focus_area": "European Capitals",
-      "topic": "World Geography"
-    }
-  ]' https://www.pioneerapi.tangikuu.tech/question/create/
-  ```
+- **Example Call using Postman:**
+  1. Open Postman.
+  2. Set the request type to `POST`.
+  3. Enter the URL: `https://www.pioneerapi.tangikuu.tech/question/create/`.
+  4. Set the headers:
+      - `Content-Type: application/json`
+  5. Enter the request body as raw JSON:
+      ```json
+      [
+        {
+          "question": "What is the capital of Spain?",
+          "options": ["Madrid", "Barcelona", "Seville", "Valencia"],
+          "correct_answer": "Madrid",
+          "level": "Intermediate",
+          "industry": "Geography",
+          "focus_area": "European Capitals",
+          "topic": "World Geography"
+        }
+      ]
+      ```
 - **Example Response:**
   ```json
   {
@@ -102,18 +108,24 @@
 - **Parameters:**
   - `question_id` (path parameter): The unique ID of the question to update.
 - **Request Body:** JSON object containing updated question details (See QuestionCreate model for object structure).
-- **Example Call:**
-  ```bash
-  curl -X PUT -H "Content-Type: application/json" -d '{
-    "question": "What is the capital of Italy?",
-    "options": ["Rome", "Milan", "Florence", "Venice"],
-    "correct_answer": "Rome",
-    "level": "Intermediate",
-    "industry": "Geography",
-    "focus_area": "European Capitals",
-    "topic": "World Geography"
-  }' https://www.pioneerapi.tangikuu.tech/question/update/123
-  ```
+- **Example Call using Postman:**
+  1. Open Postman.
+  2. Set the request type to `PUT`.
+  3. Enter the URL: `https://www.pioneerapi.tangikuu.tech/question/update/123`.
+  4. Set the headers:
+      - `Content-Type: application/json`
+  5. Enter the request body as raw JSON:
+      ```json
+      {
+        "question": "What is the capital of Italy?",
+        "options": ["Rome", "Milan", "Florence", "Venice"],
+        "correct_answer": "Rome",
+        "level": "Intermediate",
+        "industry": "Geography",
+        "focus_area": "European Capitals",
+        "topic": "World Geography"
+      }
+      ```
 - **Example Response:**
   ```json
   {
@@ -130,10 +142,10 @@
 - **Description:** Delete an existing question based on its ID.
 - **Parameters:**
   - `question_id` (path parameter): The unique ID of the question to delete.
-- **Example Call:**
-  ```bash
-  curl -X DELETE https://www.pioneerapi.tangikuu.tech/question/delete/123
-  ```
+- **Example Call using Postman:**
+  1. Open Postman.
+  2. Set the request type to `DELETE`.
+  3. Enter the URL: `https://www.pioneerapi.tangikuu.tech/question/delete/123`.
 - **Example Response:**
   ```json
   {

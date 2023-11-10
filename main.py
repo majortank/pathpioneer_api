@@ -1,13 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel
 import random
-import sqlite3
+import firebase_admin
+from firebase_admin import credentials, firestore
 import markdown
-from fastapi.responses import HTMLResponse
-
 
 app = FastAPI()
 
@@ -38,11 +37,10 @@ class QuestionResponse(BaseModel):
     focus_area: str
     topic: str
 
-# Helper function to get database connection
-def get_db():
-    conn = sqlite3.connect('questions.db')
-    cursor = conn.cursor()
-    return conn, cursor
+# Initialize Firebase Admin SDK
+cred = credentials.Certificate("serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 # ASCII art for a question mark
 QUESTION_MARK = r"""
@@ -60,64 +58,54 @@ def get_interesting_404_message(level: str):
 # Endpoints with enhanced responses
 @app.get("/question/{level}")
 async def get_question(level: str):
-    conn, cursor = get_db()
-    cursor.execute('SELECT * FROM questions WHERE level = ?', (level,))
-    questions = cursor.fetchall()
-    conn.close()
+    questions_ref = db.collection('questions')
+    query = questions_ref.where('level', '==', level).stream()
+    questions = [doc.to_dict() for doc in query]
 
     if not questions:
         raise HTTPException(status_code=404, detail=get_interesting_404_message(level))
 
     random_question = random.choice(questions)
-    response = QuestionResponse(question=random_question[1], options=random_question[2].split(","), correct_answer=random_question[3], level=random_question[4], industry=random_question[5], focus_area=random_question[6], topic=random_question[7])
+    response = QuestionResponse(**random_question)
     return response
 
 @app.get("/question/all/{level}")
 async def get_all_questions(level: str):
-    conn, cursor = get_db()
-    cursor.execute('SELECT * FROM questions WHERE level = ?', (level,))
-    questions = cursor.fetchall()
-    conn.close()
+    questions_ref = db.collection('questions')
+    query = questions_ref.where('level', '==', level).stream()
+    questions = [doc.to_dict() for doc in query]
 
     if not questions:
         raise HTTPException(status_code=404, detail=get_interesting_404_message(level))
 
-    response_data = [{"question": question[1], "options": question[2].split(","), "correct_answer": question[3], "level": question[4], "industry": question[5], "focus_area": question[6], "topic": question[7]} for question in questions]
-    return response_data
+    return questions
 
-@app.post("/question/create/")
-async def create_questions(questions: List[QuestionCreate]):
-    conn, cursor = get_db()
-    question_ids = []
-    for question in questions:
-        cursor.execute('''
-            INSERT INTO questions (question, options, correct_answer, level, industry, focus_area, topic)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (question.question, ",".join(question.options), question.correct_answer, question.level, question.industry, question.focus_area, question.topic))
-        conn.commit()
-        question_id = cursor.lastrowid
-        question_ids.append(question_id)
-    conn.close()
-    return {"message": "Questions created successfully", "question_ids": question_ids}
+@app.post("/question/create")
+async def create_question(questions_data: List[QuestionCreate]):
+    if not questions_data:
+        raise HTTPException(status_code=400, detail="No questions provided")
+
+    batch = db.batch()
+
+    for question_data in questions_data:
+        new_question_ref = db.collection('questions').document()
+        batch.set(new_question_ref, question_data.dict())
+
+    batch.commit()
+    
+
+    return {"message": "Questions created successfully"}
 
 @app.put("/question/update/{question_id}")
-async def update_question(question_id: int, question: QuestionCreate):
-    conn, cursor = get_db()
-    cursor.execute('''
-        UPDATE questions
-        SET question = ?, options = ?, correct_answer = ?, level = ?, industry = ?, focus_area = ?, topic = ?
-        WHERE id = ?
-    ''', (question.question, ",".join(question.options), question.correct_answer, question.level, question.industry, question.focus_area, question.topic, question_id))
-    conn.commit()
-    conn.close()
+async def update_question(question_id: str, question: QuestionCreate):
+    questions_ref = db.collection('questions')
+    questions_ref.document(question_id).set(question.dict(), merge=True)
     return {"message": "Question updated successfully"}
 
 @app.delete("/question/delete/{question_id}")
-async def delete_question(question_id: int):
-    conn, cursor = get_db()
-    cursor.execute('DELETE FROM questions WHERE id = ?', (question_id,))
-    conn.commit()
-    conn.close()
+async def delete_question(question_id: str):
+    questions_ref = db.collection('questions')
+    questions_ref.document(question_id).delete()
     return {"message": "Question deleted successfully"}
 
 # Default endpoint displaying full API documentation
