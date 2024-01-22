@@ -2,3 +2,4 @@ fastapi
 uvicorn
 markdown
 firebase-admin
+gunicorn

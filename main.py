@@ -7,6 +7,9 @@ import random
 import firebase_admin
 from firebase_admin import credentials, firestore
 import markdown
+from datetime import datetime
+
+
 
 app = FastAPI()
 
@@ -36,6 +39,16 @@ class QuestionResponse(BaseModel):
     industry: str
     focus_area: str
     topic: str
+
+class Notification(BaseModel):
+    title: str
+    content: str
+    version: str
+    type: str
+
+class NotificationResponse(Notification):
+    timestamp: str
+    id: str
 
 # Initialize Firebase Admin SDK
 cred = credentials.Certificate("serviceAccountKey.json")
@@ -80,6 +93,18 @@ async def get_all_questions(level: str):
 
     return questions
 
+
+def question_exists(question_text):
+    # Implement logic to check if a question with the provided text already exists in Firebase
+    questions_ref = db.collection('questions')
+    query = questions_ref.where('question', '==', question_text).limit(1)
+
+    existing_questions = query.get()
+
+    return len(existing_questions) > 0 if existing_questions else False
+
+
+
 @app.post("/question/create")
 async def create_question(questions_data: List[QuestionCreate]):
     if not questions_data:
@@ -88,13 +113,18 @@ async def create_question(questions_data: List[QuestionCreate]):
     batch = db.batch()
 
     for question_data in questions_data:
+        # Check if the question already exists in Firebase
+        if question_exists(question_data.question):
+            raise HTTPException(status_code=400, detail="Question already exists")
+
         new_question_ref = db.collection('questions').document()
         batch.set(new_question_ref, question_data.dict())
 
     batch.commit()
-    
 
     return {"message": "Questions created successfully"}
+
+
 
 @app.put("/question/update/{question_id}")
 async def update_question(question_id: str, question: QuestionCreate):
@@ -107,6 +137,45 @@ async def delete_question(question_id: str):
     questions_ref = db.collection('questions')
     questions_ref.document(question_id).delete()
     return {"message": "Question deleted successfully"}
+
+# Endpoints for notifications
+
+# Create a notification
+@app.post("/notifications", response_model=NotificationResponse)
+async def create_notification(notification: Notification):
+    doc_ref = db.collection('notifications').document()
+    id = doc_ref.id
+    timestamp = datetime.now().isoformat()
+    notification_data = notification.dict()
+    notification_data.update({"id": id, "timestamp": timestamp})
+    doc_ref.set(notification_data)
+    return NotificationResponse(**notification_data)
+
+@app.get("/notifications", response_model=List[NotificationResponse])
+async def get_notifications():
+    docs = db.collection('notifications').stream()
+    return [NotificationResponse(**doc.to_dict()) for doc in docs]
+
+@app.put("/notifications/{id}", response_model=NotificationResponse)
+async def update_notification(id: str, notification: Notification):
+    doc_ref = db.collection('notifications').document(id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notification_data = notification.dict()
+    notification_data.update({"id": id, "timestamp": doc.to_dict()["timestamp"]})
+    doc_ref.set(notification_data)
+    return NotificationResponse(**notification_data)
+
+@app.delete("/notifications/{id}")
+async def delete_notification(id: str):
+    doc_ref = db.collection('notifications').document(id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    doc_ref.delete()
+    return {"detail": "Notification deleted"}
+
 
 # Default endpoint displaying full API documentation
 @app.get("/")
